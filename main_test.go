@@ -59,6 +59,26 @@ func TestNewQueryBuilder(t *testing.T) {
 			args:   []interface{}{12},
 		},
 
+		// Join
+		{
+			title:  "Test Join Type Default",
+			data:   NewQueryBuilder().From("users", "u").Join(Join{Table: "event", As: "e", On: `"u"."id_event" = "e"."id_event"`}),
+			result: `SELECT * FROM "users" AS "u" INNER JOIN "event" AS "e" ON "u"."id_event" = "e"."id_event"`,
+			args:   []interface{}{},
+		},
+		{
+			title:  "Test Join Type Right Join",
+			data:   NewQueryBuilder().From("users", "u").Join(Join{Table: "event", As: "e", On: `"u"."id_event" = "e"."id_event"`, Type: RightJoin}),
+			result: `SELECT * FROM "users" AS "u" RIGHT JOIN "event" AS "e" ON "u"."id_event" = "e"."id_event"`,
+			args:   []interface{}{},
+		},
+		{
+			title:  "Test Join Multiple",
+			data:   NewQueryBuilder().From("users", "u").Join(Join{Table: "event", As: "e", On: `"u"."id_event" = "e"."id_event"`}).Join(Join{Table: "address", As: "a", On: `"e"."id_address" = "a"."id_address"`, Type: RightJoin}),
+			result: `SELECT * FROM "users" AS "u" INNER JOIN "event" AS "e" ON "u"."id_event" = "e"."id_event" RIGHT JOIN "address" AS "a" ON "e"."id_address" = "a"."id_address"`,
+			args:   []interface{}{},
+		},
+
 		// Where
 		{
 			title:  "Test Where String",

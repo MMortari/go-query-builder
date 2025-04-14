@@ -14,11 +14,28 @@ type OrderBy struct {
 	Column string
 	Type   string
 }
+
+type JoinType string
+
+const (
+	InnerJoin JoinType = "INNER JOIN"
+	LeftJoin  JoinType = "LEFT JOIN"
+	RightJoin JoinType = "RIGHT JOIN"
+	FullJoin  JoinType = "FULL JOIN"
+)
+
+type Join struct {
+	Table string
+	As    string
+	On    string
+	Type  JoinType
+}
 type QueryBuilder struct {
 	query strings.Builder
 
 	from      string
 	selects   []string
+	joins     []Join
 	wheresAnd [][]Where
 	wheresOr  [][]Where
 	limit     *int
@@ -41,6 +58,10 @@ func (q *QueryBuilder) From(from ...string) *QueryBuilder {
 }
 func (q *QueryBuilder) Select(selects ...string) *QueryBuilder {
 	q.selects = selects
+	return q
+}
+func (q *QueryBuilder) Join(join Join) *QueryBuilder {
+	q.joins = append(q.joins, join)
 	return q
 }
 func (q *QueryBuilder) WhereAnd(where ...Where) *QueryBuilder {
@@ -84,7 +105,17 @@ func (q *QueryBuilder) ToSelectSql() (query string, queryData []interface{}) {
 	q.query.WriteString(fmt.Sprintf(`FROM %s`, q.from))
 
 	// JOIN
-	// TODO: implement join
+	if len(q.joins) != 0 {
+		for _, item := range q.joins {
+			joinType := InnerJoin
+
+			if item.Type != "" {
+				joinType = item.Type
+			}
+
+			q.query.WriteString(fmt.Sprintf(` %s "%s" AS "%s" ON %s`, joinType, item.Table, item.As, item.On))
+		}
+	}
 
 	// WHERE
 	var where string
