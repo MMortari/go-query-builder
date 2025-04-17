@@ -5,15 +5,9 @@ import (
 	"strings"
 )
 
-type WhereILike struct {
-	Ref string
-}
-type WhereLike struct {
-	Ref string
-}
 type Where struct {
 	Column string
-	Type   interface{}
+	Type   string
 	Val    interface{}
 }
 type OrderBy struct {
@@ -200,19 +194,8 @@ func (q *QueryBuilder) parseWhere(whereAnd []Where, itemNum *int, queryData *[]i
 		(*itemNum)++
 		*queryData = append(*queryData, item.Val)
 
-		Type := item.Type
+		Type := strings.ToUpper(item.Type)
 		val := fmt.Sprintf("$%d", *itemNum)
-
-		switch item.Type.(type) {
-		case WhereILike:
-			typ := item.Type.(WhereILike)
-			Type = "ILIKE"
-			val = fmt.Sprintf("'%s'", strings.Replace(typ.Ref, "VAL", fmt.Sprintf("$%d", *itemNum), 1))
-		case WhereLike:
-			typ := item.Type.(WhereLike)
-			Type = "LIKE"
-			val = fmt.Sprintf("'%s'", strings.Replace(typ.Ref, "VAL", fmt.Sprintf("$%d", *itemNum), 1))
-		}
 
 		wheres = append(wheres, fmt.Sprintf(`%s %s %s`, item.Column, Type, val))
 	}

@@ -3,6 +3,7 @@ package query
 import (
 	"testing"
 
+	pg_query "github.com/pganalyze/pg_query_go/v6"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -88,15 +89,15 @@ func TestNewQueryBuilder(t *testing.T) {
 		},
 		{
 			title:  "Test Where String Like",
-			data:   NewQueryBuilder().From("users").Select("*").WhereAnd(Where{Column: "name", Type: WhereLike{Ref: "_VAL%"}, Val: "Mark"}).OrderBy(OrderBy{Column: "age"}),
-			result: `SELECT * FROM "users" WHERE (name LIKE '_$1%') ORDER BY age`,
-			args:   []interface{}{"Mark"},
+			data:   NewQueryBuilder().From("users").Select("*").WhereAnd(Where{Column: "name", Type: "like", Val: "_Mark%"}).OrderBy(OrderBy{Column: "age"}),
+			result: `SELECT * FROM "users" WHERE (name LIKE $1) ORDER BY age`,
+			args:   []interface{}{"_Mark%"},
 		},
 		{
 			title:  "Test Where String ILike",
-			data:   NewQueryBuilder().From("users").Select("*").WhereAnd(Where{Column: "name", Type: WhereILike{Ref: "%VAL%"}, Val: "Mark"}).OrderBy(OrderBy{Column: "age"}),
-			result: `SELECT * FROM "users" WHERE (name ILIKE '%$1%') ORDER BY age`,
-			args:   []interface{}{"Mark"},
+			data:   NewQueryBuilder().From("users").Select("*").WhereAnd(Where{Column: "name", Type: "ilike", Val: "%Mark%"}).OrderBy(OrderBy{Column: "age"}),
+			result: `SELECT * FROM "users" WHERE (name ILIKE $1) ORDER BY age`,
+			args:   []interface{}{"%Mark%"},
 		},
 		{
 			title:  "Test Where Int",
@@ -176,6 +177,10 @@ func TestNewQueryBuilder(t *testing.T) {
 
 			assert.Equalf(t, query, item.result, "Invalid query")
 			assert.Equalf(t, args, item.args, "Invalid args")
+
+			// Running a third-party query parse to validate the query to improve confiability
+			_, err := pg_query.Parse(item.result)
+			assert.NoError(t, err)
 		})
 	}
 }
