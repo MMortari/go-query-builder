@@ -87,6 +87,18 @@ func TestNewQueryBuilder(t *testing.T) {
 			args:   []interface{}{"Mark"},
 		},
 		{
+			title:  "Test Where String Like",
+			data:   NewQueryBuilder().From("users").Select("*").WhereAnd(Where{Column: "name", Type: WhereLike{Ref: "_VAL%"}, Val: "Mark"}).OrderBy(OrderBy{Column: "age"}),
+			result: `SELECT * FROM "users" WHERE (name LIKE '_$1%') ORDER BY age`,
+			args:   []interface{}{"Mark"},
+		},
+		{
+			title:  "Test Where String ILike",
+			data:   NewQueryBuilder().From("users").Select("*").WhereAnd(Where{Column: "name", Type: WhereILike{Ref: "%VAL%"}, Val: "Mark"}).OrderBy(OrderBy{Column: "age"}),
+			result: `SELECT * FROM "users" WHERE (name ILIKE '%$1%') ORDER BY age`,
+			args:   []interface{}{"Mark"},
+		},
+		{
 			title:  "Test Where Int",
 			data:   NewQueryBuilder().From("users").Select("*").WhereAnd(Where{Column: "age", Type: "<=", Val: 18}),
 			result: `SELECT * FROM "users" WHERE (age <= $1)`,

@@ -5,9 +5,15 @@ import (
 	"strings"
 )
 
+type WhereILike struct {
+	Ref string
+}
+type WhereLike struct {
+	Ref string
+}
 type Where struct {
 	Column string
-	Type   string
+	Type   interface{}
 	Val    interface{}
 }
 type OrderBy struct {
@@ -169,46 +175,15 @@ func (q *QueryBuilder) getWhere() (string, []interface{}) {
 		whereAndBuilder := make([]string, 0)
 
 		for _, whereAnd := range q.wheresAnd {
-			wheres := make([]string, 0, len(q.wheresAnd))
-
-			for _, item := range whereAnd {
-				itemNum++
-				queryData = append(queryData, item.Val)
-				switch item.Val.(type) {
-				case string:
-					wheres = append(wheres, fmt.Sprintf(`%s %s $%d`, item.Column, item.Type, itemNum))
-				case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-					wheres = append(wheres, fmt.Sprintf(`%s %s $%d`, item.Column, item.Type, itemNum))
-				case float32, float64:
-					wheres = append(wheres, fmt.Sprintf(`%s %s $%d`, item.Column, item.Type, itemNum))
-				case bool:
-					wheres = append(wheres, fmt.Sprintf(`%s %s $%d`, item.Column, item.Type, itemNum))
-				}
-			}
-
+			wheres := q.parseWhere(whereAnd, &itemNum, &queryData)
 			whereAndBuilder = append(whereAndBuilder, fmt.Sprintf("(%s)", strings.Join(wheres, " AND ")))
 		}
+
 		wheresToOr = append(wheresToOr, strings.Join(whereAndBuilder, " AND "))
 	}
 	if len(q.wheresOr) != 0 {
 		for _, whereAnd := range q.wheresOr {
-			wheres := make([]string, 0, len(q.wheresOr))
-
-			for _, item := range whereAnd {
-				itemNum++
-				queryData = append(queryData, item.Val)
-				switch item.Val.(type) {
-				case string:
-					wheres = append(wheres, fmt.Sprintf(`%s %s $%d`, item.Column, item.Type, itemNum))
-				case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-					wheres = append(wheres, fmt.Sprintf(`%s %s $%d`, item.Column, item.Type, itemNum))
-				case float32, float64:
-					wheres = append(wheres, fmt.Sprintf(`%s %s $%d`, item.Column, item.Type, itemNum))
-				case bool:
-					wheres = append(wheres, fmt.Sprintf(`%s %s $%d`, item.Column, item.Type, itemNum))
-				}
-			}
-
+			wheres := q.parseWhere(whereAnd, &itemNum, &queryData)
 			wheresToOr = append(wheresToOr, fmt.Sprintf("(%s)", strings.Join(wheres, " AND ")))
 		}
 	}
@@ -216,4 +191,31 @@ func (q *QueryBuilder) getWhere() (string, []interface{}) {
 	qb.WriteString(strings.Join(wheresToOr, " OR "))
 
 	return qb.String(), queryData
+}
+
+func (q *QueryBuilder) parseWhere(whereAnd []Where, itemNum *int, queryData *[]interface{}) []string {
+	wheres := make([]string, 0, len(q.wheresAnd))
+
+	for _, item := range whereAnd {
+		(*itemNum)++
+		*queryData = append(*queryData, item.Val)
+
+		Type := item.Type
+		val := fmt.Sprintf("$%d", *itemNum)
+
+		switch item.Type.(type) {
+		case WhereILike:
+			typ := item.Type.(WhereILike)
+			Type = "ILIKE"
+			val = fmt.Sprintf("'%s'", strings.Replace(typ.Ref, "VAL", fmt.Sprintf("$%d", *itemNum), 1))
+		case WhereLike:
+			typ := item.Type.(WhereLike)
+			Type = "LIKE"
+			val = fmt.Sprintf("'%s'", strings.Replace(typ.Ref, "VAL", fmt.Sprintf("$%d", *itemNum), 1))
+		}
+
+		wheres = append(wheres, fmt.Sprintf(`%s %s %s`, item.Column, Type, val))
+	}
+
+	return wheres
 }
