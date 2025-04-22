@@ -31,8 +31,6 @@ type Join struct {
 	Type  JoinType
 }
 type QueryBuilder struct {
-	query strings.Builder
-
 	from      string
 	selects   []string
 	joins     []Join
@@ -92,17 +90,19 @@ func (q *QueryBuilder) OrderBy(orderBy OrderBy) *QueryBuilder {
 }
 
 func (q *QueryBuilder) ToSelectSql() (query string, queryData []interface{}) {
+	qb := strings.Builder{}
+
 	// SELECT
-	q.query.WriteString("SELECT ")
+	qb.WriteString("SELECT ")
 	if len(q.selects) == 0 {
-		q.query.WriteString("*")
+		qb.WriteString("*")
 	} else {
-		q.query.WriteString(strings.Join(q.selects, ", "))
+		qb.WriteString(strings.Join(q.selects, ", "))
 	}
-	q.query.WriteString(" ")
+	qb.WriteString(" ")
 
 	// FROM
-	q.query.WriteString(fmt.Sprintf(`FROM %s`, q.from))
+	qb.WriteString(fmt.Sprintf(`FROM %s`, q.from))
 
 	// JOIN
 	if len(q.joins) != 0 {
@@ -113,18 +113,18 @@ func (q *QueryBuilder) ToSelectSql() (query string, queryData []interface{}) {
 				joinType = item.Type
 			}
 
-			q.query.WriteString(fmt.Sprintf(` %s "%s" AS "%s" ON %s`, joinType, item.Table, item.As, item.On))
+			qb.WriteString(fmt.Sprintf(` %s "%s" AS "%s" ON %s`, joinType, item.Table, item.As, item.On))
 		}
 	}
 
 	// WHERE
 	var where string
 	where, queryData = q.getWhere()
-	q.query.WriteString(where)
+	qb.WriteString(where)
 
 	// ORDER BY
 	if len(q.orderBys) != 0 {
-		q.query.WriteString(" ORDER BY ")
+		qb.WriteString(" ORDER BY ")
 		orderBy := make([]string, 0, len(q.orderBys))
 
 		for _, item := range q.orderBys {
@@ -135,18 +135,51 @@ func (q *QueryBuilder) ToSelectSql() (query string, queryData []interface{}) {
 			}
 		}
 
-		q.query.WriteString(strings.Join(orderBy, ", "))
+		qb.WriteString(strings.Join(orderBy, ", "))
 	}
 	// LIMIT
 	if q.limit != nil {
-		q.query.WriteString(fmt.Sprintf(" LIMIT %d", *q.limit))
+		qb.WriteString(fmt.Sprintf(" LIMIT %d", *q.limit))
 	}
 	// OFFSET
 	if q.offset != nil {
-		q.query.WriteString(fmt.Sprintf(" OFFSET %d", *q.offset))
+		qb.WriteString(fmt.Sprintf(" OFFSET %d", *q.offset))
 	}
 
-	query = q.query.String()
+	query = qb.String()
+
+	return query, queryData
+}
+func (q *QueryBuilder) ToSelectTotalSql() (query string, queryData []interface{}) {
+	qb := strings.Builder{}
+
+	// SELECT
+	qb.WriteString("SELECT COUNT(*) AS total")
+	qb.WriteString(" ")
+
+	// FROM
+	qb.WriteString(fmt.Sprintf(`FROM %s`, q.from))
+
+	// JOIN
+	if len(q.joins) != 0 {
+		for _, item := range q.joins {
+			joinType := InnerJoin
+
+			if item.Type != "" {
+				joinType = item.Type
+			}
+
+			qb.WriteString(fmt.Sprintf(` %s "%s" AS "%s" ON %s`, joinType, item.Table, item.As, item.On))
+		}
+	}
+
+	// WHERE
+	var where string
+	where, queryData = q.getWhere()
+	qb.WriteString(where)
+
+	query = qb.String()
+	qb = strings.Builder{}
 
 	return query, queryData
 }
