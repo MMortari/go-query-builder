@@ -160,6 +160,20 @@ func TestNewQueryBuilder(t *testing.T) {
 			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (name = $1 AND age = $2) OR (name != $3 AND salary >= $4) OR (name = $5 AND is_hired = $6)`,
 			args:        []interface{}{"Mark", 18, "James", 15899.85, "Joanes", true},
 		},
+		{
+			title:       "Test Where Between",
+			data:        NewQueryBuilder().From("users").Select("*").WhereAnd(Where{Column: "age", Type: "between", Val: []int{10, 20}}),
+			result:      `SELECT * FROM "users" WHERE (age BETWEEN $1 AND $2)`,
+			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (age BETWEEN $1 AND $2)`,
+			args:        []interface{}{10, 20},
+		},
+		{
+			title:       "Test Where IS NULL",
+			data:        NewQueryBuilder().From("users").Select("*").WhereAnd(Where{Column: "age", Type: "is null"}),
+			result:      `SELECT * FROM "users" WHERE (age IS NULL)`,
+			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (age IS NULL)`,
+			args:        []interface{}{},
+		},
 
 		// Order By
 		{

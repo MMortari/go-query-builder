@@ -2,6 +2,7 @@ package query
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -224,13 +225,31 @@ func (q *QueryBuilder) parseWhere(whereAnd []Where, itemNum *int, queryData *[]i
 	wheres := make([]string, 0, len(q.wheresAnd))
 
 	for _, item := range whereAnd {
-		(*itemNum)++
-		*queryData = append(*queryData, item.Val)
 
 		Type := strings.ToUpper(item.Type)
-		val := fmt.Sprintf("$%d", *itemNum)
 
-		wheres = append(wheres, fmt.Sprintf(`%s %s %s`, item.Column, Type, val))
+		var val string
+
+		if item.Val != nil {
+			if reflect.TypeOf(item.Val).Kind() == reflect.Slice {
+				values := make([]string, 0)
+				s := reflect.ValueOf(item.Val)
+				for i := 0; i < s.Len(); i++ {
+					value := s.Index(i).Interface()
+
+					(*itemNum)++
+					*queryData = append(*queryData, value)
+					values = append(values, fmt.Sprintf(" $%d", *itemNum))
+				}
+				val = strings.Join(values, " AND")
+			} else {
+				(*itemNum)++
+				*queryData = append(*queryData, item.Val)
+				val = fmt.Sprintf(" $%d", *itemNum)
+			}
+		}
+
+		wheres = append(wheres, fmt.Sprintf(`%s %s%s`, item.Column, Type, val))
 	}
 
 	return wheres
