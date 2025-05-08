@@ -39,6 +39,7 @@ type QueryBuilder struct {
 	wheresOr  [][]Where
 	limit     *int
 	offset    *int
+	groupBy   []string
 	orderBys  []OrderBy
 }
 
@@ -93,6 +94,10 @@ func (q *QueryBuilder) OrderBy(orderBy OrderBy) *QueryBuilder {
 	q.orderBys = append(q.orderBys, orderBy)
 	return q
 }
+func (q *QueryBuilder) GroupBy(groupBy ...string) *QueryBuilder {
+	q.groupBy = groupBy
+	return q
+}
 
 func (q *QueryBuilder) ToSelectSql() (query string, queryData []interface{}) {
 	qb := strings.Builder{}
@@ -126,6 +131,12 @@ func (q *QueryBuilder) ToSelectSql() (query string, queryData []interface{}) {
 	var where string
 	where, queryData = q.getWhere()
 	qb.WriteString(where)
+
+	// GROUP BY
+	if len(q.groupBy) != 0 {
+		qb.WriteString(" GROUP BY ")
+		qb.WriteString(strings.Join(q.groupBy, ", "))
+	}
 
 	// ORDER BY
 	if len(q.orderBys) != 0 {

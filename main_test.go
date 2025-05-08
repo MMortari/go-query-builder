@@ -73,7 +73,7 @@ func TestNewQueryBuilder(t *testing.T) {
 			args:        []interface{}{12},
 		},
 		{
-			title:       "Test Clear Select 1",
+			title:       "Test Clear Select 2",
 			data:        NewQueryBuilder().From("users").Select("id", "name").WhereAnd(Where{Column: "age", Type: "=", Val: 12}).OrderBy(OrderBy{Column: "age"}).ClearSelect().Select("age"),
 			result:      `SELECT age FROM "users" WHERE (age = $1) ORDER BY age`,
 			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (age = $1)`,
@@ -187,6 +187,22 @@ func TestNewQueryBuilder(t *testing.T) {
 			result:      `SELECT * FROM "users" WHERE (age IS NULL)`,
 			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (age IS NULL)`,
 			args:        []interface{}{},
+		},
+
+		// Group By
+		{
+			title:       "Test Group By",
+			data:        NewQueryBuilder().From("users").Select("age", "COUNT(salary)", "SUM(salary)").WhereAnd(Where{Column: "age", Type: "=", Val: 12}).GroupBy("age").OrderBy(OrderBy{Column: "age"}),
+			result:      `SELECT age, COUNT(salary), SUM(salary) FROM "users" WHERE (age = $1) GROUP BY age ORDER BY age`,
+			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (age = $1)`,
+			args:        []interface{}{12},
+		},
+		{
+			title:       "Test Group By Multiple",
+			data:        NewQueryBuilder().From("users").Select("age", "COUNT(salary)", "SUM(salary)").WhereAnd(Where{Column: "age", Type: "=", Val: 12}).GroupBy("age", "name", "id").OrderBy(OrderBy{Column: "age"}),
+			result:      `SELECT age, COUNT(salary), SUM(salary) FROM "users" WHERE (age = $1) GROUP BY age, name, id ORDER BY age`,
+			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (age = $1)`,
+			args:        []interface{}{12},
 		},
 
 		// Order By
