@@ -59,6 +59,10 @@ func (q *QueryBuilder) Select(selects ...string) *QueryBuilder {
 	q.selects = selects
 	return q
 }
+func (q *QueryBuilder) ClearSelect() *QueryBuilder {
+	q.selects = make([]string, 0)
+	return q
+}
 func (q *QueryBuilder) Join(join Join) *QueryBuilder {
 	q.joins = append(q.joins, join)
 	return q

@@ -65,6 +65,20 @@ func TestNewQueryBuilder(t *testing.T) {
 			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (age = $1)`,
 			args:        []interface{}{12},
 		},
+		{
+			title:       "Test Clear Select 1",
+			data:        NewQueryBuilder().From("users").Select("id", "name").WhereAnd(Where{Column: "age", Type: "=", Val: 12}).OrderBy(OrderBy{Column: "age"}).ClearSelect(),
+			result:      `SELECT * FROM "users" WHERE (age = $1) ORDER BY age`,
+			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (age = $1)`,
+			args:        []interface{}{12},
+		},
+		{
+			title:       "Test Clear Select 1",
+			data:        NewQueryBuilder().From("users").Select("id", "name").WhereAnd(Where{Column: "age", Type: "=", Val: 12}).OrderBy(OrderBy{Column: "age"}).ClearSelect().Select("age"),
+			result:      `SELECT age FROM "users" WHERE (age = $1) ORDER BY age`,
+			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (age = $1)`,
+			args:        []interface{}{12},
+		},
 
 		// Join
 		{
