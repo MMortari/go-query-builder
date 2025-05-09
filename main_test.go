@@ -253,18 +253,34 @@ func TestNewQueryBuilder(t *testing.T) {
 
 		// Config
 		{
-			title:       "Test Parse Where false",
-			data:        NewQueryBuilder(ParseWhere(false)).From("users").WhereAnd(Where{Column: "name", Type: "=", Val: "Mark"}),
-			result:      `SELECT * FROM "users" WHERE (name = 'Mark')`,
-			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (name = 'Mark')`,
+			title: "Test Parse Where false",
+			data: NewQueryBuilder(ParseWhere(false)).From("users").WhereAnd(
+				Where{Column: "name", Type: "=", Val: "Mark"},
+				Where{Column: "age", Type: "=", Val: int(18)},
+				Where{Column: "salary", Type: "=", Val: float64(15000.50)},
+				Where{Column: "active", Type: "=", Val: true},
+				Where{Column: "permission", Type: "in", Val: []any{"admin", "user", int(18), float64(15000.50), false}},
+				Where{Column: "distance", Type: "between", Val: []any{0, 100}},
+				Where{Column: "is_hired", Type: "is null"},
+			),
+			result:      `SELECT * FROM "users" WHERE (name = 'Mark' AND age = 18 AND salary = 15000.50 AND active = true AND permission IN ('admin', 'user', 18, 15000.50, false) AND distance BETWEEN 0 AND 100 AND is_hired IS NULL)`,
+			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (name = 'Mark' AND age = 18 AND salary = 15000.50 AND active = true AND permission IN ('admin', 'user', 18, 15000.50, false) AND distance BETWEEN 0 AND 100 AND is_hired IS NULL)`,
 			args:        []interface{}{},
 		},
 		{
-			title:       "Test Parse Where true",
-			data:        NewQueryBuilder(ParseWhere(true)).From("users").WhereAnd(Where{Column: "name", Type: "=", Val: "Mark"}),
-			result:      `SELECT * FROM "users" WHERE (name = $1)`,
-			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (name = $1)`,
-			args:        []interface{}{"Mark"},
+			title: "Test Parse Where true",
+			data: NewQueryBuilder(ParseWhere(true)).From("users").WhereAnd(
+				Where{Column: "name", Type: "=", Val: "Mark"},
+				Where{Column: "age", Type: "=", Val: int(18)},
+				Where{Column: "salary", Type: "=", Val: float64(15000.50)},
+				Where{Column: "active", Type: "=", Val: true},
+				Where{Column: "permission", Type: "in", Val: []any{"admin", "user", int(18), float64(15000.50), false}},
+				Where{Column: "distance", Type: "between", Val: []any{0, 100}},
+				Where{Column: "is_hired", Type: "is null"},
+			),
+			result:      `SELECT * FROM "users" WHERE (name = $1 AND age = $2 AND salary = $3 AND active = $4 AND permission IN ($5, $6, $7, $8, $9) AND distance BETWEEN $10 AND $11 AND is_hired IS NULL)`,
+			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (name = $1 AND age = $2 AND salary = $3 AND active = $4 AND permission IN ($5, $6, $7, $8, $9) AND distance BETWEEN $10 AND $11 AND is_hired IS NULL)`,
+			args:        []interface{}{"Mark", 18, 15000.5, true, "admin", "user", 18, 15000.5, false, 0, 100},
 		},
 	}
 

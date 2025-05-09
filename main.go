@@ -273,29 +273,51 @@ func (q *QueryBuilder) parseWhere(whereAnd []Where, itemNum *int, queryData *[]i
 				for i := 0; i < s.Len(); i++ {
 					value := s.Index(i).Interface()
 
-					(*itemNum)++
-					*queryData = append(*queryData, value)
-					values = append(values, fmt.Sprintf(" $%d", *itemNum))
+					if q.config.parseWhere {
+						(*itemNum)++
+						*queryData = append(*queryData, value)
+						values = append(values, fmt.Sprintf("$%d", *itemNum))
+					} else {
+						values = append(values, q.getWhereValue(value))
+					}
 				}
-				val = strings.Join(values, " AND")
+
+				if Type == "IN" || Type == "NOT IN" {
+					val = fmt.Sprintf("(%s)", strings.Join(values, ", "))
+				} else {
+					val = strings.Join(values, " AND ")
+				}
 			} else {
 				if q.config.parseWhere {
 					(*itemNum)++
 					*queryData = append(*queryData, item.Val)
-					val = fmt.Sprintf(" $%d", *itemNum)
+					val = fmt.Sprintf("$%d", *itemNum)
 				} else {
-					switch item.Val.(type) {
-					case string:
-						val = fmt.Sprintf(" '%s'", item.Val)
-					default:
-						val = fmt.Sprintf(" %s", item.Val)
-					}
+					val = q.getWhereValue(item.Val)
 				}
 			}
 		}
 
-		wheres = append(wheres, fmt.Sprintf(`%s %s%s`, item.Column, Type, val))
+		if val == "" {
+			wheres = append(wheres, fmt.Sprintf(`%s %s`, item.Column, Type))
+		} else {
+			wheres = append(wheres, fmt.Sprintf(`%s %s %s`, item.Column, Type, val))
+		}
 	}
 
 	return wheres
+}
+func (q *QueryBuilder) getWhereValue(val any) (resp string) {
+	switch val.(type) {
+	case string:
+		resp = fmt.Sprintf("'%s'", val)
+	case int, int16, int32, int64:
+		resp = fmt.Sprintf("%d", val)
+	case float32, float64:
+		resp = fmt.Sprintf("%.2f", val)
+	case bool:
+		resp = fmt.Sprintf("%t", val)
+	}
+
+	return resp
 }
