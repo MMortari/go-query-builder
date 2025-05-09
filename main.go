@@ -31,7 +31,10 @@ type Join struct {
 	On    string
 	Type  JoinType
 }
+
 type QueryBuilder struct {
+	config Config
+
 	from      string
 	selects   []string
 	joins     []Join
@@ -43,8 +46,20 @@ type QueryBuilder struct {
 	orderBys  []OrderBy
 }
 
-func NewQueryBuilder() *QueryBuilder {
-	return &QueryBuilder{}
+func NewQueryBuilder(configs ...QueryBuilderConfig) *QueryBuilder {
+	config := Config{
+		parseWhere: true,
+	}
+
+	qb := &QueryBuilder{
+		config: config,
+	}
+
+	for _, item := range configs {
+		item(qb)
+	}
+
+	return qb
 }
 
 func (q *QueryBuilder) From(from ...string) *QueryBuilder {
@@ -94,12 +109,17 @@ func (q *QueryBuilder) OrderBy(orderBy OrderBy) *QueryBuilder {
 	q.orderBys = append(q.orderBys, orderBy)
 	return q
 }
+func (q *QueryBuilder) ClearOrderBy() *QueryBuilder {
+	q.orderBys = make([]OrderBy, 0)
+	return q
+}
 func (q *QueryBuilder) GroupBy(groupBy ...string) *QueryBuilder {
 	q.groupBy = groupBy
 	return q
 }
 
 func (q *QueryBuilder) ToSelectSql() (query string, queryData []interface{}) {
+
 	qb := strings.Builder{}
 
 	// SELECT
@@ -153,10 +173,12 @@ func (q *QueryBuilder) ToSelectSql() (query string, queryData []interface{}) {
 
 		qb.WriteString(strings.Join(orderBy, ", "))
 	}
+
 	// LIMIT
 	if q.limit != nil {
 		qb.WriteString(fmt.Sprintf(" LIMIT %d", *q.limit))
 	}
+
 	// OFFSET
 	if q.offset != nil {
 		qb.WriteString(fmt.Sprintf(" OFFSET %d", *q.offset))
@@ -240,7 +262,6 @@ func (q *QueryBuilder) parseWhere(whereAnd []Where, itemNum *int, queryData *[]i
 	wheres := make([]string, 0, len(q.wheresAnd))
 
 	for _, item := range whereAnd {
-
 		Type := strings.ToUpper(item.Type)
 
 		var val string
@@ -258,9 +279,18 @@ func (q *QueryBuilder) parseWhere(whereAnd []Where, itemNum *int, queryData *[]i
 				}
 				val = strings.Join(values, " AND")
 			} else {
-				(*itemNum)++
-				*queryData = append(*queryData, item.Val)
-				val = fmt.Sprintf(" $%d", *itemNum)
+				if q.config.parseWhere {
+					(*itemNum)++
+					*queryData = append(*queryData, item.Val)
+					val = fmt.Sprintf(" $%d", *itemNum)
+				} else {
+					switch item.Val.(type) {
+					case string:
+						val = fmt.Sprintf(" '%s'", item.Val)
+					default:
+						val = fmt.Sprintf(" %s", item.Val)
+					}
+				}
 			}
 		}
 

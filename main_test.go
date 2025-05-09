@@ -227,6 +227,20 @@ func TestNewQueryBuilder(t *testing.T) {
 			resultTotal: `SELECT COUNT(*) AS total FROM "users"`,
 			args:        []interface{}{},
 		},
+		{
+			title:       "Test Select Clear Order By",
+			data:        NewQueryBuilder().From("users").Select("*").OrderBy(OrderBy{Column: "name", Type: "DESC"}).ClearOrderBy(),
+			result:      `SELECT * FROM "users"`,
+			resultTotal: `SELECT COUNT(*) AS total FROM "users"`,
+			args:        []interface{}{},
+		},
+		{
+			title:       "Test Select Clear Order By",
+			data:        NewQueryBuilder().From("users").Select("*").OrderBy(OrderBy{Column: "name", Type: "DESC"}).ClearOrderBy().OrderBy(OrderBy{Column: "age", Type: "DESC"}),
+			result:      `SELECT * FROM "users" ORDER BY age DESC`,
+			resultTotal: `SELECT COUNT(*) AS total FROM "users"`,
+			args:        []interface{}{},
+		},
 
 		// Pagination Paged
 		{
@@ -235,6 +249,22 @@ func TestNewQueryBuilder(t *testing.T) {
 			result:      `SELECT * FROM "users" LIMIT 25 OFFSET 0`,
 			resultTotal: `SELECT COUNT(*) AS total FROM "users"`,
 			args:        []interface{}{},
+		},
+
+		// Config
+		{
+			title:       "Test Parse Where false",
+			data:        NewQueryBuilder(ParseWhere(false)).From("users").WhereAnd(Where{Column: "name", Type: "=", Val: "Mark"}),
+			result:      `SELECT * FROM "users" WHERE (name = 'Mark')`,
+			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (name = 'Mark')`,
+			args:        []interface{}{},
+		},
+		{
+			title:       "Test Parse Where true",
+			data:        NewQueryBuilder(ParseWhere(true)).From("users").WhereAnd(Where{Column: "name", Type: "=", Val: "Mark"}),
+			result:      `SELECT * FROM "users" WHERE (name = $1)`,
+			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (name = $1)`,
+			args:        []interface{}{"Mark"},
 		},
 	}
 
