@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Where struct {
@@ -34,6 +37,8 @@ type Join struct {
 
 type QueryBuilder struct {
 	config Config
+
+	otelSpan trace.Span
 
 	from      string
 	selects   []string
@@ -69,10 +74,12 @@ func (q *QueryBuilder) From(from ...string) *QueryBuilder {
 	if len(from) == 2 {
 		q.from = fmt.Sprintf(`"%s" AS "%s"`, from[0], from[1])
 	}
+	q.setSpanAttribute("db.collection.name", from[0])
 	return q
 }
 func (q *QueryBuilder) Select(selects ...string) *QueryBuilder {
 	q.selects = selects
+	q.setSpanAttribute("db.operation.name", "SELECT")
 	return q
 }
 func (q *QueryBuilder) ClearSelect() *QueryBuilder {
@@ -186,6 +193,8 @@ func (q *QueryBuilder) ToSelectSql() (query string, queryData []interface{}) {
 
 	query = qb.String()
 
+	q.setSpanAttribute("db.query.text", query)
+
 	return query, queryData
 }
 func (q *QueryBuilder) ToSelectTotalSql() (query string, queryData []interface{}) {
@@ -288,6 +297,7 @@ func (q *QueryBuilder) parseWhere(whereAnd []Where, itemNum *int, queryData *[]i
 					val = strings.Join(values, " AND ")
 				}
 			} else {
+				q.setSpanAttribute("db.query.parameter."+item.Column, fmt.Sprint(item.Val))
 				if q.config.parseWhere {
 					(*itemNum)++
 					*queryData = append(*queryData, item.Val)
@@ -311,13 +321,14 @@ func (q *QueryBuilder) getWhereValue(val any) (resp string) {
 	switch val.(type) {
 	case string:
 		resp = fmt.Sprintf("'%s'", val)
-	case int, int16, int32, int64:
-		resp = fmt.Sprintf("%d", val)
-	case float32, float64:
-		resp = fmt.Sprintf("%.2f", val)
-	case bool:
-		resp = fmt.Sprintf("%t", val)
+	default:
+		resp = fmt.Sprint(val)
 	}
 
 	return resp
+}
+func (q *QueryBuilder) setSpanAttribute(key, val string) {
+	if q.otelSpan != nil {
+		q.otelSpan.SetAttributes(attribute.String(key, val))
+	}
 }
