@@ -1,10 +1,15 @@
 package query
 
 import (
+	"context"
 	"testing"
 
 	pg_query "github.com/pganalyze/pg_query_go/v6"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 type TestCase struct {
@@ -253,7 +258,7 @@ func TestNewQueryBuilder(t *testing.T) {
 
 		// Config
 		{
-			title: "Test Parse Where false",
+			title: "Test Config Parse Where false",
 			data: NewQueryBuilder(ParseWhere(false)).From("users").WhereAnd(
 				Where{Column: "name", Type: "=", Val: "Mark"},
 				Where{Column: "age", Type: "=", Val: int(18)},
@@ -268,7 +273,7 @@ func TestNewQueryBuilder(t *testing.T) {
 			args:        []interface{}{},
 		},
 		{
-			title: "Test Parse Where true",
+			title: "Test Config Parse Where true",
 			data: NewQueryBuilder(ParseWhere(true)).From("users").WhereAnd(
 				Where{Column: "name", Type: "=", Val: "Mark"},
 				Where{Column: "age", Type: "=", Val: int(18)},
@@ -288,19 +293,71 @@ func TestNewQueryBuilder(t *testing.T) {
 		t.Run(item.title, func(t *testing.T) {
 			query, args := item.data.ToSelectSql()
 
-			assert.Equalf(t, query, item.result, "Invalid query")
-			assert.Equalf(t, args, item.args, "Invalid args")
-
-			if item.resultTotal != "" {
-				queryTotal, argsTotal := item.data.ToSelectTotalSql()
-
-				assert.Equalf(t, queryTotal, item.resultTotal, "Invalid query")
-				assert.Equalf(t, argsTotal, item.args, "Invalid args")
-			}
-
-			// Running a third-party query parse to validate the query to improve confiability
-			_, err := pg_query.Parse(item.result)
-			assert.NoError(t, err)
+			validateQuery(t, item, query, args)
 		})
 	}
+
+	t.Run("Validate Otel Span Attribute", func(t *testing.T) {
+		spanRecorder := tracetest.NewSpanRecorder()
+		provider := trace.NewTracerProvider(
+			trace.WithSpanProcessor(spanRecorder),
+		)
+		tracer := provider.Tracer("test-tracer")
+
+		_, span := tracer.Start(context.Background(), "test-span")
+		defer span.End()
+
+		testCase := TestCase{
+			title: "Test Config Otel Span",
+			data: NewQueryBuilder(SetOtelSpan(span)).Select("*").From("users").WhereAnd(
+				Where{Column: "name", Type: "=", Val: "Mark"},
+				Where{Column: "age", Type: "=", Val: int(18)},
+				Where{Column: "salary", Type: "=", Val: float64(15000.50)},
+				Where{Column: "active", Type: "=", Val: true},
+			),
+			result:      `SELECT * FROM "users" WHERE (name = $1 AND age = $2 AND salary = $3 AND active = $4)`,
+			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (name = $1 AND age = $2 AND salary = $3 AND active = $4)`,
+			args:        []interface{}{"Mark", 18, 15000.5, true},
+		}
+
+		query, args := testCase.data.ToSelectSql()
+
+		span.End()
+
+		// Recuperar os spans gravados
+		spans := spanRecorder.Ended()
+		// Verificar se pelo menos um span foi registrado
+		require.Len(t, spans, 1)
+		// Recuperar o primeiro span
+		recordedSpan := spans[0]
+		// Verificar se os atributos esperados foram adicionados
+		attrs := recordedSpan.Attributes()
+
+		// Verificar atributos específicos
+		assert.Contains(t, attrs, attribute.String("db.collection.name", "users"))
+		assert.Contains(t, attrs, attribute.String("db.operation.name", "SELECT"))
+		assert.Contains(t, attrs, attribute.String("db.query.text", query))
+		assert.Contains(t, attrs, attribute.String("db.query.parameter.name", "Mark"))
+		assert.Contains(t, attrs, attribute.String("db.query.parameter.age", "18"))
+		assert.Contains(t, attrs, attribute.String("db.query.parameter.salary", "15000.5"))
+		assert.Contains(t, attrs, attribute.String("db.query.parameter.active", "true"))
+
+		validateQuery(t, testCase, query, args)
+	})
+}
+
+func validateQuery(t *testing.T, item TestCase, query string, args []interface{}) {
+	assert.Equalf(t, query, item.result, "Invalid query")
+	assert.Equalf(t, args, item.args, "Invalid args")
+
+	if item.resultTotal != "" {
+		queryTotal, argsTotal := item.data.ToSelectTotalSql()
+
+		assert.Equalf(t, queryTotal, item.resultTotal, "Invalid query")
+		assert.Equalf(t, argsTotal, item.args, "Invalid args")
+	}
+
+	// Running a third-party query parse to validate the query to improve confiability
+	_, err := pg_query.Parse(item.result)
+	assert.NoError(t, err)
 }
