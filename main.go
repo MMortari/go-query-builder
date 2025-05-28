@@ -14,6 +14,10 @@ type Where struct {
 	Type   string
 	Val    interface{}
 }
+type Value struct {
+	Column string
+	Val    interface{}
+}
 type OrderBy struct {
 	Column string
 	Type   string
@@ -42,6 +46,7 @@ type QueryBuilder struct {
 
 	from      string
 	selects   []string
+	values    []Value
 	joins     []Join
 	wheresAnd [][]Where
 	wheresOr  [][]Where
@@ -80,6 +85,10 @@ func (q *QueryBuilder) From(from ...string) *QueryBuilder {
 func (q *QueryBuilder) Select(selects ...string) *QueryBuilder {
 	q.selects = selects
 	q.setSpanAttribute("db.operation.name", "SELECT")
+	return q
+}
+func (q *QueryBuilder) Values(values ...Value) *QueryBuilder {
+	q.values = append(q.values, values...)
 	return q
 }
 func (q *QueryBuilder) ClearSelect() *QueryBuilder {
@@ -227,6 +236,35 @@ func (q *QueryBuilder) ToSelectTotalSql() (query string, queryData []interface{}
 
 	query = qb.String()
 	qb = strings.Builder{}
+
+	return query, queryData
+}
+
+func (q *QueryBuilder) ToUpdateQuery() (query string, queryData []interface{}) {
+	qb := strings.Builder{}
+
+	qb.WriteString("UPDATE ")
+
+	// FROM
+	qb.WriteString(fmt.Sprintf(`%s SET `, q.from))
+
+	// VALUES
+	values := make([]string, 0, len(q.values))
+	for _, item := range q.values {
+		values = append(values, fmt.Sprintf(`%s = ?`, item.Column))
+		queryData = append(queryData, item.Val)
+	}
+	qb.WriteString(strings.Join(values, ", "))
+
+	// WHERE
+	var where string
+	where, queryDataWhere := q.getWhere()
+	queryData = append(queryData, queryDataWhere...)
+	qb.WriteString(where)
+
+	query = qb.String()
+
+	q.setSpanAttribute("db.operation.text", query)
 
 	return query, queryData
 }

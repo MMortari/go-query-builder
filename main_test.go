@@ -20,7 +20,7 @@ type TestCase struct {
 	args        []interface{}
 }
 
-func TestNewQueryBuilder(t *testing.T) {
+func TestNewQueryBuilderSelect(t *testing.T) {
 	qb := NewQueryBuilder()
 
 	assert.NotNil(t, qb, "QueryBuilder instance should not be nil")
@@ -293,7 +293,7 @@ func TestNewQueryBuilder(t *testing.T) {
 		t.Run(item.title, func(t *testing.T) {
 			query, args := item.data.ToSelectSql()
 
-			validateQuery(t, item, query, args)
+			validateSelectQuery(t, item, query, args)
 		})
 	}
 
@@ -342,11 +342,102 @@ func TestNewQueryBuilder(t *testing.T) {
 		assert.Contains(t, attrs, attribute.String("db.query.parameter.salary", "15000.5"))
 		assert.Contains(t, attrs, attribute.String("db.query.parameter.active", "true"))
 
-		validateQuery(t, testCase, query, args)
+		validateSelectQuery(t, testCase, query, args)
+	})
+}
+func TestNewQueryBuilderUpdate(t *testing.T) {
+	qb := NewQueryBuilder()
+
+	assert.NotNil(t, qb, "QueryBuilder instance should not be nil")
+	assert.Empty(t, qb.from, "QueryBuilder 'from' field should be empty")
+	assert.Empty(t, qb.selects, "QueryBuilder 'selects' field should be empty")
+	assert.Empty(t, qb.wheresAnd, "QueryBuilder 'wheres' field should be empty")
+	assert.Nil(t, qb.limit, "QueryBuilder 'limit' field should be nil")
+	assert.Nil(t, qb.offset, "QueryBuilder 'offset' field should be nil")
+	assert.Empty(t, qb.orderBys, "QueryBuilder 'orderBys' field should be empty")
+
+	data := []TestCase{
+		// From
+		{
+			title:  "Test Simple",
+			data:   NewQueryBuilder().From("users").Values(Value{Column: "name", Val: "Mark"}, Value{Column: "age", Val: 18}, Value{Column: "salary", Val: 15000.50}, Value{Column: "active", Val: true}),
+			result: `UPDATE "users" SET name = ?, age = ?, salary = ?, active = ?`,
+			args:   []interface{}{"Mark", 18, 15000.50, true},
+		},
+		// Where
+		{
+			title:  "Test Where",
+			data:   NewQueryBuilder().From("users").Values(Value{Column: "name", Val: "Mark"}, Value{Column: "age", Val: 18}, Value{Column: "salary", Val: 15000.50}, Value{Column: "active", Val: true}).WhereAnd(Where{Column: "id", Type: "=", Val: 1}),
+			result: `UPDATE "users" SET name = ?, age = ?, salary = ?, active = ? WHERE (id = $1)`,
+			args:   []interface{}{"Mark", 18, 15000.50, true, 1},
+		},
+	}
+
+	for _, item := range data {
+		t.Run(item.title, func(t *testing.T) {
+			query, args := item.data.ToUpdateQuery()
+
+			validateUpdateQuery(t, item, query, args)
+		})
+	}
+
+	t.Run("Validate Otel Span Attribute", func(t *testing.T) {
+		t.Skip()
+		spanRecorder := tracetest.NewSpanRecorder()
+		provider := trace.NewTracerProvider(
+			trace.WithSpanProcessor(spanRecorder),
+		)
+		tracer := provider.Tracer("test-tracer")
+
+		_, span := tracer.Start(context.Background(), "test-span")
+		defer span.End()
+
+		testCase := TestCase{
+			title: "Test Config Otel Span",
+			data: NewQueryBuilder(SetOtelSpan(span)).From("users").
+				Values(
+					Value{Column: "name", Val: "Mark"},
+					Value{Column: "age", Val: 18},
+					Value{Column: "salary", Val: 15000.50},
+					Value{Column: "active", Val: true},
+				).
+				WhereAnd(
+					Where{Column: "name", Type: "=", Val: "Mark"},
+					Where{Column: "age", Type: "=", Val: int(18)},
+					Where{Column: "salary", Type: "=", Val: float64(15000.50)},
+					Where{Column: "active", Type: "=", Val: true},
+				),
+			result: `UPDATE "users" SET name = ?, age = ?, salary = ?, active = ? WHERE (name = $1 AND age = $2 AND salary = $3 AND active = $4)`,
+			args:   []interface{}{"Mark", 18, 15000.5, true, "Mark", 18, 15000.5, true},
+		}
+
+		query, args := testCase.data.ToUpdateQuery()
+
+		span.End()
+
+		// Recuperar os spans gravados
+		spans := spanRecorder.Ended()
+		// Verificar se pelo menos um span foi registrado
+		require.Len(t, spans, 1)
+		// Recuperar o primeiro span
+		recordedSpan := spans[0]
+		// Verificar se os atributos esperados foram adicionados
+		attrs := recordedSpan.Attributes()
+
+		// Verificar atributos específicos
+		assert.Contains(t, attrs, attribute.String("db.collection.name", "users"))
+		assert.Contains(t, attrs, attribute.String("db.operation.name", "UPDATE"))
+		assert.Contains(t, attrs, attribute.String("db.query.text", query))
+		assert.Contains(t, attrs, attribute.String("db.query.parameter.name", "Mark"))
+		assert.Contains(t, attrs, attribute.String("db.query.parameter.age", "18"))
+		assert.Contains(t, attrs, attribute.String("db.query.parameter.salary", "15000.5"))
+		assert.Contains(t, attrs, attribute.String("db.query.parameter.active", "true"))
+
+		validateUpdateQuery(t, testCase, query, args)
 	})
 }
 
-func validateQuery(t *testing.T, item TestCase, query string, args []interface{}) {
+func validateSelectQuery(t *testing.T, item TestCase, query string, args []interface{}) {
 	assert.Equalf(t, query, item.result, "Invalid query")
 	assert.Equalf(t, args, item.args, "Invalid args")
 
@@ -360,4 +451,15 @@ func validateQuery(t *testing.T, item TestCase, query string, args []interface{}
 	// Running a third-party query parse to validate the query to improve confiability
 	_, err := pg_query.Parse(item.result)
 	assert.NoError(t, err)
+}
+func validateUpdateQuery(t *testing.T, item TestCase, query string, args []interface{}) {
+	assert.Equalf(t, query, item.result, "Invalid query")
+	assert.Equalf(t, args, item.args, "Invalid args")
+
+	if item.resultTotal != "" {
+		queryTotal, argsTotal := item.data.ToUpdateQuery()
+
+		assert.Equalf(t, queryTotal, item.resultTotal, "Invalid query")
+		assert.Equalf(t, argsTotal, item.args, "Invalid args")
+	}
 }
