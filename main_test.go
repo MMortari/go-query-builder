@@ -361,14 +361,14 @@ func TestNewQueryBuilderUpdate(t *testing.T) {
 		{
 			title:  "Test Simple",
 			data:   NewQueryBuilder().From("users").Values(Value{Column: "name", Val: "Mark"}, Value{Column: "age", Val: 18}, Value{Column: "salary", Val: 15000.50}, Value{Column: "active", Val: true}),
-			result: `UPDATE "users" SET name = ?, age = ?, salary = ?, active = ?`,
+			result: `UPDATE "users" SET name = $1, age = $2, salary = $3, active = $4`,
 			args:   []interface{}{"Mark", 18, 15000.50, true},
 		},
 		// Where
 		{
 			title:  "Test Where",
 			data:   NewQueryBuilder().From("users").Values(Value{Column: "name", Val: "Mark"}, Value{Column: "age", Val: 18}, Value{Column: "salary", Val: 15000.50}, Value{Column: "active", Val: true}).WhereAnd(Where{Column: "id", Type: "=", Val: 1}),
-			result: `UPDATE "users" SET name = ?, age = ?, salary = ?, active = ? WHERE (id = $1)`,
+			result: `UPDATE "users" SET name = $1, age = $2, salary = $3, active = $4 WHERE (id = $5)`,
 			args:   []interface{}{"Mark", 18, 15000.50, true, 1},
 		},
 	}

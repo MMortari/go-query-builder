@@ -135,7 +135,6 @@ func (q *QueryBuilder) GroupBy(groupBy ...string) *QueryBuilder {
 }
 
 func (q *QueryBuilder) ToSelectSql() (query string, queryData []interface{}) {
-
 	qb := strings.Builder{}
 
 	// SELECT
@@ -165,7 +164,7 @@ func (q *QueryBuilder) ToSelectSql() (query string, queryData []interface{}) {
 
 	// WHERE
 	var where string
-	where, queryData = q.getWhere()
+	where, queryData = q.getWhere(0)
 	qb.WriteString(where)
 
 	// GROUP BY
@@ -231,7 +230,7 @@ func (q *QueryBuilder) ToSelectTotalSql() (query string, queryData []interface{}
 
 	// WHERE
 	var where string
-	where, queryData = q.getWhere()
+	where, queryData = q.getWhere(0)
 	qb.WriteString(where)
 
 	query = qb.String()
@@ -249,16 +248,19 @@ func (q *QueryBuilder) ToUpdateQuery() (query string, queryData []interface{}) {
 	qb.WriteString(fmt.Sprintf(`%s SET `, q.from))
 
 	// VALUES
+	var itemNum int
+
 	values := make([]string, 0, len(q.values))
 	for _, item := range q.values {
-		values = append(values, fmt.Sprintf(`%s = ?`, item.Column))
+		itemNum++
+		values = append(values, fmt.Sprintf(`%s = $%d`, item.Column, itemNum))
 		queryData = append(queryData, item.Val)
 	}
 	qb.WriteString(strings.Join(values, ", "))
 
 	// WHERE
 	var where string
-	where, queryDataWhere := q.getWhere()
+	where, queryDataWhere := q.getWhere(itemNum)
 	queryData = append(queryData, queryDataWhere...)
 	qb.WriteString(where)
 
@@ -269,7 +271,7 @@ func (q *QueryBuilder) ToUpdateQuery() (query string, queryData []interface{}) {
 	return query, queryData
 }
 
-func (q *QueryBuilder) getWhere() (string, []interface{}) {
+func (q *QueryBuilder) getWhere(itemNum int) (string, []interface{}) {
 	queryData := make([]interface{}, 0)
 
 	if len(q.wheresOr) == 0 && len(q.wheresAnd) == 0 {
@@ -279,7 +281,6 @@ func (q *QueryBuilder) getWhere() (string, []interface{}) {
 	qb := strings.Builder{}
 
 	qb.WriteString(" WHERE ")
-	itemNum := 0
 
 	wheresToOr := make([]string, 0)
 
