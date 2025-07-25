@@ -371,3 +371,8 @@ func (q *QueryBuilder) setSpanAttribute(key, val string) {
 		q.otelSpan.SetAttributes(attribute.String(key, val))
 	}
 }
+
+// Utils
+func (q *QueryBuilder) HasValues() bool {
+	return len(q.values) != 0
+}

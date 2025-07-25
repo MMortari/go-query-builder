@@ -18,6 +18,7 @@ type TestCase struct {
 	result      string
 	resultTotal string
 	args        []interface{}
+	utils       map[string]any
 }
 
 func TestNewQueryBuilderSelect(t *testing.T) {
@@ -360,9 +361,17 @@ func TestNewQueryBuilderUpdate(t *testing.T) {
 		// From
 		{
 			title:  "Test Simple",
-			data:   NewQueryBuilder().From("users").Values(Value{Column: "name", Val: "Mark"}, Value{Column: "age", Val: 18}, Value{Column: "salary", Val: 15000.50}, Value{Column: "active", Val: true}),
-			result: `UPDATE "users" SET name = $1, age = $2, salary = $3, active = $4`,
-			args:   []interface{}{"Mark", 18, 15000.50, true},
+			data:   NewQueryBuilder().From("users").Values(Value{Column: "name", Val: "Mark"}, Value{Column: "age", Val: 18}, Value{Column: "salary", Val: 15000.50}, Value{Column: "active", Val: true}).Values(Value{Column: "updated_at", Val: "NOW()"}),
+			result: `UPDATE "users" SET name = $1, age = $2, salary = $3, active = $4, updated_at = $5`,
+			args:   []interface{}{"Mark", 18, 15000.50, true, "NOW()"},
+			utils:  map[string]any{"HasValues": true},
+		},
+		{
+			title:  "Test Simple Empty",
+			data:   NewQueryBuilder().From("users"),
+			result: `UPDATE "users" SET `,
+			args:   nil,
+			utils:  map[string]any{"HasValues": false},
 		},
 		// Where
 		{
@@ -370,6 +379,7 @@ func TestNewQueryBuilderUpdate(t *testing.T) {
 			data:   NewQueryBuilder().From("users").Values(Value{Column: "name", Val: "Mark"}, Value{Column: "age", Val: 18}, Value{Column: "salary", Val: 15000.50}, Value{Column: "active", Val: true}).WhereAnd(Where{Column: "id", Type: "=", Val: 1}),
 			result: `UPDATE "users" SET name = $1, age = $2, salary = $3, active = $4 WHERE (id = $5)`,
 			args:   []interface{}{"Mark", 18, 15000.50, true, 1},
+			utils:  map[string]any{"HasValues": true},
 		},
 	}
 
@@ -455,6 +465,12 @@ func validateSelectQuery(t *testing.T, item TestCase, query string, args []inter
 func validateUpdateQuery(t *testing.T, item TestCase, query string, args []interface{}) {
 	assert.Equalf(t, query, item.result, "Invalid query")
 	assert.Equalf(t, args, item.args, "Invalid args")
+
+	for util, val := range item.utils {
+		if util == "HasValues" {
+			assert.Equalf(t, val, item.data.HasValues(), "Invalid query")
+		}
+	}
 
 	if item.resultTotal != "" {
 		queryTotal, argsTotal := item.data.ToUpdateQuery()
