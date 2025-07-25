@@ -373,6 +373,20 @@ func (q *QueryBuilder) setSpanAttribute(key, val string) {
 }
 
 // Utils
+
+// HasValues verifica se existem valores definidos para serem utilizados em operações de UPDATE.
+//
+// Retorna true, indicando que há colunas e valores prontos para serem atualizados na query. Caso contrário, retorna false.
+//
+// Exemplo de uso:
+//
+//	qb := query.NewQueryBuilder().
+//	    From("users").
+//	    Values(query.Value{Column: "name", Val: "Novo Nome"})
+//
+//	if qb.HasValues() {
+//	    // Pode executar um UPDATE
+//	}
 func (q *QueryBuilder) HasValues() bool {
 	return len(q.values) != 0
 }
