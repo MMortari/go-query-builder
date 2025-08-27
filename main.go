@@ -318,6 +318,8 @@ func (q *QueryBuilder) parseWhere(whereAnd []Where, itemNum *int, queryData *[]i
 			if reflect.TypeOf(item.Val).Kind() == reflect.Slice {
 				values := make([]string, 0)
 				s := reflect.ValueOf(item.Val)
+
+				spanItemValues := make([]string, 0, s.Len())
 				for i := 0; i < s.Len(); i++ {
 					value := s.Index(i).Interface()
 
@@ -328,7 +330,9 @@ func (q *QueryBuilder) parseWhere(whereAnd []Where, itemNum *int, queryData *[]i
 					} else {
 						values = append(values, q.getWhereValue(value))
 					}
+					spanItemValues = append(spanItemValues, fmt.Sprint(value))
 				}
+				q.setSpanAttributeSlice("db.query.parameter."+item.Column, spanItemValues)
 
 				if Type == "IN" || Type == "NOT IN" {
 					val = fmt.Sprintf("(%s)", strings.Join(values, ", "))
@@ -369,6 +373,11 @@ func (q *QueryBuilder) getWhereValue(val any) (resp string) {
 func (q *QueryBuilder) setSpanAttribute(key, val string) {
 	if q.otelSpan != nil {
 		q.otelSpan.SetAttributes(attribute.String(key, val))
+	}
+}
+func (q *QueryBuilder) setSpanAttributeSlice(key string, val []string) {
+	if q.otelSpan != nil {
+		q.otelSpan.SetAttributes(attribute.StringSlice(key, val))
 	}
 }
 
