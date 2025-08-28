@@ -83,7 +83,7 @@ func (q *QueryBuilder) From(from ...string) *QueryBuilder {
 	return q
 }
 func (q *QueryBuilder) Select(selects ...string) *QueryBuilder {
-	q.selects = selects
+	q.selects = append(q.selects, selects...)
 	q.setSpanAttribute("db.operation.name", "SELECT")
 	return q
 }

@@ -315,10 +315,11 @@ func TestNewQueryBuilderSelect(t *testing.T) {
 				Where{Column: "age", Type: "=", Val: int(18)},
 				Where{Column: "salary", Type: "=", Val: float64(15000.50)},
 				Where{Column: "active", Type: "=", Val: true},
+				Where{Column: "status", Type: "in", Val: []string{"admin", "user"}},
 			),
-			result:      `SELECT * FROM "users" WHERE (name = $1 AND age = $2 AND salary = $3 AND active = $4)`,
-			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (name = $1 AND age = $2 AND salary = $3 AND active = $4)`,
-			args:        []interface{}{"Mark", 18, 15000.5, true},
+			result:      `SELECT * FROM "users" WHERE (name = $1 AND age = $2 AND salary = $3 AND active = $4 AND status IN ($5, $6))`,
+			resultTotal: `SELECT COUNT(*) AS total FROM "users" WHERE (name = $1 AND age = $2 AND salary = $3 AND active = $4 AND status IN ($5, $6))`,
+			args:        []interface{}{"Mark", 18, 15000.5, true, "admin", "user"},
 		}
 
 		query, args := testCase.data.ToSelectSql()
@@ -342,6 +343,7 @@ func TestNewQueryBuilderSelect(t *testing.T) {
 		assert.Contains(t, attrs, attribute.String("db.query.parameter.age", "18"))
 		assert.Contains(t, attrs, attribute.String("db.query.parameter.salary", "15000.5"))
 		assert.Contains(t, attrs, attribute.String("db.query.parameter.active", "true"))
+		assert.Contains(t, attrs, attribute.StringSlice("db.query.parameter.status", []string{"admin", "user"}))
 
 		validateSelectQuery(t, testCase, query, args)
 	})
